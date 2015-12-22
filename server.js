@@ -5,14 +5,12 @@ var express = require('express'),
     conf = require('./config.json'),
     VROne = require('VROne.min.js');
 
-
-var i;
-var connectedClients = 0;
 var clients = [];
 var sendO3Ds = [];
 
-var idCount = 0;
-var o3Ds = [];
+var i = 0, connectedClients = 0, idCount = 0,
+    score1 = 0, score2 = 0;
+var player1, player2;
 var panePlayer1 = {
     active: false,
     clientID: undefined,
@@ -27,39 +25,41 @@ var panePlayer2 = {
     pane: new VROne.CubeTexture3D_3(), 
     empty: new VROne.Object3D()
 };
-var score1 = 0;
-var score2 = 0;
-var player1;
-var player2;
 
+var o3Ds = [];
+var frontWall, backWall, topWall, bottomWall, 
+    leftWall, rightWall, ball, ballCollision;
 var aquariumHeight = 10;
 
-var frontWall = new VROne.Geometry.Box(6, 5, 0.5);
-frontWall.offset.set(-frontWall.a/2.0, -frontWall.b/2.0, -frontWall.c);
-frontWall = frontWall.getO3D();
+function createO3Ds(){
+    frontWall = new VROne.Geometry.Box(6, 5, 0.5);
+    frontWall.offset.set(-frontWall.a/2.0, -frontWall.b/2.0, -frontWall.c);
+    frontWall = frontWall.getO3D();
 
-var backWall = new VROne.Geometry.Box(6, 5, 0.5);
-backWall.offset.set(-backWall.a/2.0, -backWall.b/2.0, 0);
-backWall = backWall.getO3D();
+    backWall = new VROne.Geometry.Box(6, 5, 0.5);
+    backWall.offset.set(-backWall.a/2.0, -backWall.b/2.0, 0);
+    backWall = backWall.getO3D();
 
-var topWall = new VROne.Geometry.Box(6, 0.5, 40);
-topWall.offset.set(-topWall.a/2.0, 0, -topWall.c/2.0);
-topWall = topWall.getO3D();
+    topWall = new VROne.Geometry.Box(6, 0.5, 40);
+    topWall.offset.set(-topWall.a/2.0, 0, -topWall.c/2.0);
+    topWall = topWall.getO3D();
 
-var bottomWall = new VROne.Geometry.Box(6, 0.5, 40);
-bottomWall.offset.set(-bottomWall.a/2.0, -bottomWall.b, -bottomWall.c/2.0);
-bottomWall = bottomWall.getO3D();
+    bottomWall = new VROne.Geometry.Box(6, 0.5, 40);
+    bottomWall.offset.set(-bottomWall.a/2.0, -bottomWall.b, -bottomWall.c/2.0);
+    bottomWall = bottomWall.getO3D();
 
-var leftWall = new VROne.Geometry.Box(0.5, 5, 40);
-leftWall.offset.set(-leftWall.a, -leftWall.b/2.0, -leftWall.c/2.0);
-leftWall = leftWall.getO3D();
+    leftWall = new VROne.Geometry.Box(0.5, 5, 40);
+    leftWall.offset.set(-leftWall.a, -leftWall.b/2.0, -leftWall.c/2.0);
+    leftWall = leftWall.getO3D();
 
-var rightWall = new VROne.Geometry.Box(0.5, 5, 40);
-rightWall.offset.set(0, -rightWall.b/2.0, -rightWall.c/2.0);
-rightWall = rightWall.getO3D();
+    rightWall = new VROne.Geometry.Box(0.5, 5, 40);
+    rightWall.offset.set(0, -rightWall.b/2.0, -rightWall.c/2.0);
+    rightWall = rightWall.getO3D();
 
-var ball = new VROne.Geometry.Sphere(0.2).getO3D();
-var ballCollision = [frontWall, backWall, topWall, bottomWall, leftWall, rightWall];
+    ball = new VROne.Geometry.Sphere(0.2).getO3D();
+    ballCollision = [frontWall, backWall, topWall, bottomWall, leftWall, rightWall];
+}
+createO3Ds();
 
 ////////////////////////////////////////////////////////////////////
 //Init
@@ -210,6 +210,12 @@ function addScore(player){
 //Loop
 var playersConnected = false;
 var roundActive = false;
+var firstReady = true;
+var readyTime;
+var readyCount = 0;
+var countIn = 5;
+var maxPoints = 5;
+var poolVec = new VROne.Vector3();
 
 function update(){
     setTimeout(update, 16);
@@ -250,16 +256,9 @@ function update(){
         o3Ds[i].update();
     }
 }
-
 function onPlayersConnected(){
     console.log("Players connected.");
 }
-var firstReady = true;
-var readyTime;
-var readyCount = 0;
-var countIn = 5;
-var maxPoints = 5;
-
 function onPlayersReady(){
     if(firstReady){
         console.log("Players are ready.");
@@ -305,8 +304,6 @@ function onRoundAbort(){
     ball.position.set(0, aquariumHeight, 0);
     ball.velocity.set(0, 0, 0);
 }
-
-var poolVec = new VROne.Vector3();
 function updatePane(paneObj){
 //    console.log(paneObj.player, paneObj.clientID);
     poolVec.set(0, 0, -1);
@@ -467,6 +464,8 @@ function onPlayerExit(id){
     }
 }
 
+////////////////////////////////////////////////////////////////////
+// Run
 init();
 console.log("Starting loop.");
 update();
