@@ -3,27 +3,27 @@ var express = require('express'),
     server = require('http').createServer(app),
     io = require('socket.io').listen(server),
     conf = require('./config.json'),
-    VROne = require('VROne.min.js');
+    Ayce = require('AyceVR.min.js');
 
-var clients = [];
-var sendO3Ds = [];
+var clients = [], sendO3Ds = [],
 
-var i = 0, connectedClients = 0, idCount = 0,
+    i = 0, connectedClients = 0, idCount = 0,
     score1 = 0, score2 = 0;
+
 var player1, player2;
 var panePlayer1 = {
     active: false,
     clientID: undefined,
     player: 1,
-    pane: new VROne.CubeTexture3D_3(), 
-    empty: new VROne.Object3D()
+    pane: new Ayce.Cube3D(), 
+    empty: new Ayce.Object3D()
 };
 var panePlayer2 = {
     active: false,
     clientID: undefined,
     player: 2,
-    pane: new VROne.CubeTexture3D_3(), 
-    empty: new VROne.Object3D()
+    pane: new Ayce.Cube3D(), 
+    empty: new Ayce.Object3D()
 };
 
 var o3Ds = [];
@@ -31,42 +31,39 @@ var frontWall, backWall, topWall, bottomWall,
     leftWall, rightWall, ball, ballCollision;
 var aquariumHeight = 10;
 
-function createO3Ds(){
-    frontWall = new VROne.Geometry.Box(6, 5, 0.5);
-    frontWall.offset.set(-frontWall.a/2.0, -frontWall.b/2.0, -frontWall.c);
-    frontWall = frontWall.getO3D();
-
-    backWall = new VROne.Geometry.Box(6, 5, 0.5);
-    backWall.offset.set(-backWall.a/2.0, -backWall.b/2.0, 0);
-    backWall = backWall.getO3D();
-
-    topWall = new VROne.Geometry.Box(6, 0.5, 40);
-    topWall.offset.set(-topWall.a/2.0, 0, -topWall.c/2.0);
-    topWall = topWall.getO3D();
-
-    bottomWall = new VROne.Geometry.Box(6, 0.5, 40);
-    bottomWall.offset.set(-bottomWall.a/2.0, -bottomWall.b, -bottomWall.c/2.0);
-    bottomWall = bottomWall.getO3D();
-
-    leftWall = new VROne.Geometry.Box(0.5, 5, 40);
-    leftWall.offset.set(-leftWall.a, -leftWall.b/2.0, -leftWall.c/2.0);
-    leftWall = leftWall.getO3D();
-
-    rightWall = new VROne.Geometry.Box(0.5, 5, 40);
-    rightWall.offset.set(0, -rightWall.b/2.0, -rightWall.c/2.0);
-    rightWall = rightWall.getO3D();
-
-    ball = new VROne.Geometry.Sphere(0.2).getO3D();
-    ballCollision = [frontWall, backWall, topWall, bottomWall, leftWall, rightWall];
-}
-createO3Ds();
-
 ////////////////////////////////////////////////////////////////////
 //Init
 var speedOnScoreFactor = 1.1;
 var lastBallMiss = 0;
 function init(){
-    console.log("Init...");
+    console.log("Initializing...");
+    
+    frontWall = new Ayce.Geometry.Box(6, 5, 0.5);
+    frontWall.offset.set(-frontWall.a/2.0, -frontWall.b/2.0, -frontWall.c);
+    frontWall = frontWall.getO3D();
+
+    backWall = new Ayce.Geometry.Box(6, 5, 0.5);
+    backWall.offset.set(-backWall.a/2.0, -backWall.b/2.0, 0);
+    backWall = backWall.getO3D();
+
+    topWall = new Ayce.Geometry.Box(6, 0.5, 40);
+    topWall.offset.set(-topWall.a/2.0, 0, -topWall.c/2.0);
+    topWall = topWall.getO3D();
+
+    bottomWall = new Ayce.Geometry.Box(6, 0.5, 40);
+    bottomWall.offset.set(-bottomWall.a/2.0, -bottomWall.b, -bottomWall.c/2.0);
+    bottomWall = bottomWall.getO3D();
+
+    leftWall = new Ayce.Geometry.Box(0.5, 5, 40);
+    leftWall.offset.set(-leftWall.a, -leftWall.b/2.0, -leftWall.c/2.0);
+    leftWall = leftWall.getO3D();
+
+    rightWall = new Ayce.Geometry.Box(0.5, 5, 40);
+    rightWall.offset.set(0, -rightWall.b/2.0, -rightWall.c/2.0);
+    rightWall = rightWall.getO3D();
+
+    ball = new Ayce.Geometry.Sphere(0.2).getO3D();
+    ballCollision = [frontWall, backWall, topWall, bottomWall, leftWall, rightWall];
 
     frontWall.position.set(0, aquariumHeight, -20);
     backWall.position.set(0, aquariumHeight, 20);
@@ -75,14 +72,14 @@ function init(){
     leftWall.position.set(-3, aquariumHeight, 0);
     rightWall.position.set(3, aquariumHeight, 0);
     
-    var paneScale = new VROne.Vector3(1.25, 1, 0.1);
+    var paneScale = new Ayce.Vector3(1.25, 1, 0.1);
     
-    panePlayer1.empty.position = new VROne.Vector3(0, 0, -4);
+    panePlayer1.empty.position = new Ayce.Vector3(0, 0, -4);
     panePlayer1.pane.scale = paneScale;
     panePlayer1.pane.calcBoundingBox();
     panePlayer1.pane.calcBoundingSphere();
     
-    panePlayer2.empty.position = new VROne.Vector3(0, 0, -4);
+    panePlayer2.empty.position = new Ayce.Vector3(0, 0, -4);
     panePlayer2.pane.scale = paneScale;
     panePlayer2.pane.calcBoundingBox();
     panePlayer2.pane.calcBoundingSphere();
@@ -215,7 +212,7 @@ var readyTime;
 var readyCount = 0;
 var countIn = 5;
 var maxPoints = 5;
-var poolVec = new VROne.Vector3();
+var poolVec = new Ayce.Vector3();
 
 function update(){
     setTimeout(update, 16);
@@ -355,8 +352,8 @@ io.sockets.on('connection', function (socket) {
     connectedClients++;
     var id = idCount++;
     clients[id] = {
-        position: new VROne.Vector3(),
-        rotation: new VROne.Quaternion(),
+        position: new Ayce.Vector3(),
+        rotation: new Ayce.Quaternion(),
         ready: false,
         playerType: null,
         getGlobalRotation: function(){return this.rotation;},
@@ -412,8 +409,8 @@ io.sockets.on('connection', function (socket) {
 
 function onPlayerNew(id, socket){
     var initPos = {
-        position: new VROne.Vector3(0, aquariumHeight, 0),
-        rotation: new VROne.Quaternion()
+        position: new Ayce.Vector3(0, aquariumHeight, 0),
+        rotation: new Ayce.Quaternion()
     };
     
     var playerType = "";
