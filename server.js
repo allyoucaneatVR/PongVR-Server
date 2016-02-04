@@ -6,36 +6,98 @@ var express = require('express'),
     Ayce = require('AyceVR.min.js');
 
 var i = 0, idCount = 0;
-
 var aquariumHeight = 10;
-
 var speedOnScoreFactor = 1.1;
+var gameIDCount = 1;
 
 // Websocket
 server.listen(conf.port, conf.ip);
 
 io.sockets.on('connection', function (socket) {
     idCount++;
+    gameIDCount++;
     var userId = idCount;
-
-    socket.on('new_game', function(gameId){
-        runningGames.push(new Game(gameId));
-        console.log("new game started. ID: "+gameId);
-    });
-
-    socket.on('join_game', function(data){          // TODO: non existing games can be joined. Check if game exists before.
-        for(var i = 0; i < runningGames.length; i++){
-            if(runningGames[i].id == data[0]) {
-                runningGames[i].join(data[1], socket);
-                break;
+    var gameID = gameIDCount;
+    for(var i=0; i<5; i++){
+        if(Math.random() < 0.5){
+            gameID += ""+Math.floor(Math.random()*9);
+        }
+        else{
+            gameID += ""+String.fromCharCode(97+Math.floor(Math.random()*24));
+        }
+    }
+    //Securely remove from pendingGames 
+    pendingGames.push(gameID);
+    var game = null;
+    
+    var con = socket.request.connection;
+    console.log("User connected: ID:" + userId + " IP: " + con.remoteAddress+":"+con.remotePort + ". GameID " + gameID);
+    
+    socket.on('join_game', function(data){
+        console.log("User " + userId + " joining Game... JoinID "+ data);
+        
+        if(data === "random"){
+            console.log("User #" + userId + ": Joining Random...");
+            if(pendingRandom.length > 0){
+                game = pendingRandom.shift();
+                gameID = game.id;
+            }
+            else{
+                game = new Game(gameID);
+                pendingRandom.push(game);
+                runningGames.push(game);
             }
         }
+        else if(data){
+            console.log("User #" + userId + ": Joining with id...");
+            var pID = pendingGames.indexOf(data);
+            if(pID >= 0){
+                pendingGames.splice(pID, 1);
+                game = new Game(data);
+                runningGames.push(game);
+            }
+            else{
+                for(var i = 0; i < runningGames.length; i++){
+                    if(runningGames[i].id == data){
+                        game = runningGames[i];
+                        gameID = game.id;
+                        break;
+                    }
+                }
+            }
+        }
+        else{
+            console.log("User #" + userId + ": Joining...");
+            var pID = pendingGames.indexOf(gameID); 
+            if(pID >= 0){
+                pendingGames.splice(pID, 1);
+                game = new Game(gameID);
+                runningGames.push(game);
+            }
+            else{
+                for(var i = 0; i < runningGames.length; i++){
+                    if(runningGames[i].id == gameID){
+                        game = runningGames[i];
+                        break;
+                    }
+                }
+            }
+        }
+        
+        
+        if(game){
+            game.join(userId, socket);
+        }
+        else{
+            console.log("No game to join found. GameID: " + gameID + " JoinID: " + data);
+        }
     });
-    socket.on('get_user_id', function(){
-        socket.emit('user_id', userId);
-    });
+    socket.emit('game_id', gameID);
 });
 
+var runningGames = [];
+var pendingGames = [];
+var pendingRandom = [];
 var killGame = function(id){
     for(var i = 0; i < runningGames.length; i++){
         if(runningGames[i].id == id){
@@ -46,9 +108,6 @@ var killGame = function(id){
     }
     console.log(runningGames.length + " running games left.");
 };
-
-var runningGames = [];
-
 var Game = function(id){
     var loops = [];
     var totalUsers = 0;
