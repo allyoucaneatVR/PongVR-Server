@@ -7,7 +7,9 @@ var express = require('express'),
 
 var i = 0, idCount = 0;
 var aquariumHeight = 10;
-var speedOnScoreFactor = 1.1;
+var initialZVelocity = 5;
+var zVelocityFactor = 2001/2000;
+var maxZVelocity = 15;
 var gameIDCount = 1;
 
 // Websocket
@@ -310,17 +312,16 @@ var Game = function(id){
 
             if(collisionData.collisionWith === frontWall){
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.z *= speedOnScoreFactor;
+                ball.velocity.z = -initialZVelocity;
                 addScore(0);
                 lastBallMiss = Date.now();
             }
             else if(collisionData.collisionWith === backWall){
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.z *= speedOnScoreFactor;
+                ball.velocity.z = initialZVelocity;
                 addScore(1);
                 lastBallMiss = Date.now();
             }
-
             var normal = collisionData.collisionVector.normal.copy();
             normal.scaleBy(-2*normal.dotProduct(ball.velocity));
             ball.velocity = ball.velocity.addVector3(normal);
@@ -333,6 +334,15 @@ var Game = function(id){
 
     var update = function(){
         loops[0] = setTimeout(update, 16);
+
+        if(Math.abs(ball.velocity.z) < maxZVelocity) {
+            //linear
+            if (ball.velocity.z < 0) ball.velocity.z -= initialZVelocity * (zVelocityFactor - 1);
+            else if (ball.velocity.z > 0) ball.velocity.z += initialZVelocity * (zVelocityFactor - 1);
+
+            //quadratic
+            //ball.velocity.z *= zVelocityFactor;
+        }
 
         if(panes[0].active)updatePane(panes[0]);
         if(panes[1].active)updatePane(panes[1]);
@@ -462,12 +472,14 @@ var Game = function(id){
         //console.log("Player disconnected.");
         firstReady = true;
     };
+
     var onRoundAbort = function(){
         console.log("Round end.");
         roundActive = false;
         ball.position.set(0, aquariumHeight, 0);
         ball.velocity.set(0, 0, 0);
     };
+
     var onPlayersReady = function(){
         if(firstReady){
             console.log("Players are ready.");
@@ -488,6 +500,7 @@ var Game = function(id){
             }
         }
     };
+
     var onPlayerExit = function(type){
         if(type == "player1"){
             scope.players[0] = undefined;
@@ -498,6 +511,7 @@ var Game = function(id){
             panes[1].active = false;
         }
     };
+
     var onRoundFinished = function(){
         if(score1 >= maxPoints || score2 >= maxPoints){
             console.log("Max points.");
@@ -506,6 +520,7 @@ var Game = function(id){
             scope.players[1].ready = false;
         }
     };
+
     var getPlayersPacket = function(){
         var packet = [];
         for(i = 0; i < scope.players.length; i++) {
@@ -533,7 +548,7 @@ var Game = function(id){
         console.log("Round start.");
         resetScore();
         ball.position.set(0, aquariumHeight, 0);
-        ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), 5);
+        ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
         lastBallMiss = Date.now();
     };
 
