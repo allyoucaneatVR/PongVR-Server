@@ -146,15 +146,21 @@ var Game = function(id){
         });
 
         if(scope.players[0] == undefined || scope.players[1] == undefined) {
-            var playerNo;
+            var playerIndex;
             if (scope.players.length == 0) {    // PLAYER1
-                playerNo = 0;
+                playerIndex = 0;
             }else {                             //PLAYER2
-                playerNo = 1;
+                playerIndex = 1;
             }
 
-            user.playerType = "player"+(playerNo+1);
-            if(playerNo==0){
+            user.playerType = "player"+(playerIndex+1);
+            //if(scope.players[0]){
+            //    console.log(scope.players[0].ready);
+            //}
+            //if(scope.players[1]){
+            //    console.log(scope.players[1].ready);
+            //}
+            if(playerIndex==0){
                 user.position.z = -17;
                 user.rotation.fromEulerAngles(0, Math.PI, 0);
             }else{
@@ -162,37 +168,43 @@ var Game = function(id){
             }
 
             user.socket.on('player_ready', function (data) {
-                if(!scope.players[playerNo].ready){
-                    console.log("player " + scope.players[playerNo].id + " ready.");
-                    scope.players[playerNo].ready = data.ready;
-                    emitToEveryone('ready_up', {type: scope.players[playerNo].playerType});
+                if(!scope.players[playerIndex].ready){
+                    console.log("player " + scope.players[playerIndex].id + " ready.");
+                    scope.players[playerIndex].ready = data.ready;
+                    emitToEveryone('ready_up', {type: scope.players[playerIndex].playerType});
                 }
             });
             user.socket.on('camera_pos', function(data){
-                scope.players[playerNo].position.x = data.position.x;
-                scope.players[playerNo].position.y = data.position.y;
-                scope.players[playerNo].position.z = data.position.z;
+                scope.players[playerIndex].position.x = data.position.x;
+                scope.players[playerIndex].position.y = data.position.y;
+                scope.players[playerIndex].position.z = data.position.z;
 
-                scope.players[playerNo].rotation.x = data.orientation.x;
-                scope.players[playerNo].rotation.y = data.orientation.y;
-                scope.players[playerNo].rotation.z = data.orientation.z;
-                scope.players[playerNo].rotation.w = data.orientation.w;
+                scope.players[playerIndex].rotation.x = data.orientation.x;
+                scope.players[playerIndex].rotation.y = data.orientation.y;
+                scope.players[playerIndex].rotation.z = data.orientation.z;
+                scope.players[playerIndex].rotation.w = data.orientation.w;
             });
-            panes[playerNo].active = true;
-            panes[playerNo].empty.parent = user;
-            panes[playerNo].clientID = user.id;
+            panes[playerIndex].active = true;
+            panes[playerIndex].empty.parent = user;
+            panes[playerIndex].clientID = user.id;
 
             user.socket.on('disconnect', function(){
-                emitToEveryone('remove_player', { id: scope.players[playerNo].id, type: scope.players[playerNo].type});
-                onPlayerExit(scope.players[playerNo].id);
-                console.log("Game " + id + ": Player"+(playerNo+1)+" (ID#"+scope.players[playerNo].id+") left.");
-                scope.players[playerNo] = undefined;
+                emitToEveryone('remove_player', { id: scope.players[playerIndex].id, type: scope.players[playerIndex].type});
+                onPlayerExit(scope.players[playerIndex].id);
+                console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+scope.players[playerIndex].id+") left.");
+                scope.players[playerIndex] = undefined;
                 totalUsers--;
                 killEmptyGame();
             });
-            scope.players[playerNo] = user;
+            scope.players[playerIndex] = user;
 
-            console.log("Game " + id + ": Player"+(playerNo+1)+" (ID#"+scope.players[playerNo].id+") joined.");
+            if(playerIndex==0){
+                if(scope.players[1] && scope.players[1].ready) emitToEveryone('ready_up', {type: scope.players[1].playerType});
+            }else{
+                if(scope.players[0] && scope.players[0].ready) emitToEveryone('ready_up', {type: scope.players[0].playerType});
+            }
+
+            console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+scope.players[playerIndex].id+") joined.");
 
             user.socket.emit('id', {id: user.id, type: user.playerType});
         }else {
