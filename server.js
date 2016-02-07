@@ -324,13 +324,13 @@ var Game = function(id){
 
             if(collisionData.collisionWith === frontWall){
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.z = -initialZVelocity;
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -initialZVelocity);
                 addScore(0);
                 lastBallMiss = Date.now();
             }
             else if(collisionData.collisionWith === backWall){
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.z = initialZVelocity;
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
                 addScore(1);
                 lastBallMiss = Date.now();
             }
@@ -341,8 +341,6 @@ var Game = function(id){
 
         addO3D(frontWall, backWall, leftWall, rightWall, bottomWall, leftWall, topWall, ball);
     };
-
-    // TODO: Bug: Two players join, one is ready. Player that is ready leaves. Other Player still sees that player as ready.
 
     var update = function(){
         loops[0] = setTimeout(update, 16);
