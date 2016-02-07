@@ -183,7 +183,7 @@ var Game = function(id){
             panes[playerNo].clientID = user.id;
 
             user.socket.on('disconnect', function(){
-                emitToEveryone('remove_player', { id: scope.players[playerNo].id});
+                emitToEveryone('remove_player', { id: scope.players[playerNo].id, type: scope.players[playerNo].type});
                 onPlayerExit(scope.players[playerNo].id);
                 console.log("Game " + id + ": Player"+(playerNo+1)+" (ID#"+scope.players[playerNo].id+") left.");
                 scope.players[playerNo] = undefined;
