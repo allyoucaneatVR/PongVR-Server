@@ -1,16 +1,22 @@
-var express = require('express'),   
+var fs = require('fs'),
+    express = require('express'),   
     app = express(),
-    server = require('http').createServer(app),
+    server = require('https').createServer({
+      key: fs.readFileSync('./privkey1.pem'),
+      cert: fs.readFileSync('./fullchain1.pem')
+    },app),
+//    server = require('http').createServer(app),
     io = require('socket.io').listen(server),
     conf = require('./config.json'),
     Ayce = require('AyceVR.min.js');
 
-var i = 0, idCount = 0;
-var aquariumHeight = 10;
-var initialZVelocity = 5;
-var zVelocityFactor = 2001/2000;
-var maxZVelocity = 15;
-var gameIDCount = 1;
+var i = 0, 
+    idCount = 0,
+    aquariumHeight = 10,
+    initialZVelocity = 5,
+    zVelocityFactor = 2001/2000,
+    maxZVelocity = 15,
+    gameIDCount = 1;
 
 // Websocket
 server.listen(conf.port, conf.ip);
@@ -18,8 +24,10 @@ server.listen(conf.port, conf.ip);
 io.sockets.on('connection', function (socket) {
     idCount++;
     gameIDCount++;
+    
     var userId = idCount;
     var gameID = gameIDCount;
+    
     for(var i=0; i<5; i++){
         if(Math.random() < 0.5){
             gameID += ""+Math.floor(Math.random()*9);
@@ -28,12 +36,13 @@ io.sockets.on('connection', function (socket) {
             gameID += ""+String.fromCharCode(97+Math.floor(Math.random()*24));
         }
     }
+    
     //Securely remove from pendingGames 
     pendingGames.push(gameID);
     var game = null;
     
     var con = socket.request.connection;
-    console.log("User connected: ID:" + userId + " IP: " + con.remoteAddress+":"+con.remotePort + ". GameID " + gameID);
+    console.log("+User connected: ID:" + userId + " IP: " + con.remoteAddress+":"+con.remotePort + ". GameID " + gameID);
     
     socket.on('join_game', function(data){
         console.log("User " + userId + " joining Game... JoinID "+ data);
@@ -94,6 +103,10 @@ io.sockets.on('connection', function (socket) {
             console.log("No game to join found. GameID: " + gameID + " JoinID: " + data);
         }
     });
+    
+    socket.on('disconnect', function(){
+        console.log("-User disconnected: ID:" + userId + " IP: " + con.remoteAddress+":"+con.remotePort + ". GameID " + gameID);
+    });
     socket.emit('game_id', gameID);
 });
 
@@ -108,27 +121,33 @@ var killGame = function(id){
             break;
         }
     }
+    var ipG = pendingGames.indexOf(id);
+    if(ipG >= 0){
+        pendingGames.splice(ipG, 1);
+    }
     console.log(runningGames.length + " running games left.");
 };
 var Game = function(id){
-    var loops = [];
-    var totalUsers = 0;
-    var lastBallMiss = 0;
-    var o3Ds = [];
-    var score1 = 0, score2 = 0;
-    var playersConnected = false;
-    var roundActive = false;
-    var firstReady = true;
-    var readyTime;
-    var readyCount = 0;
-    var countIn = 5;
-    var maxPoints = 5;
-    var poolVec = new Ayce.Vector3();
-    var scope = this;
-    scope.id = id;
-    scope.players = [];
-    scope.spectators = [];
-    scope.join = function(userId, socket){
+    var loops = [],
+        totalUsers = 0,
+        lastBallMiss = 0,
+        o3Ds = [],
+        score1 = 0, score2 = 0,
+        playersConnected = false,
+        roundActive = false,
+        firstReady = true,
+        readyTime,
+        readyCount = 0,
+        countIn = 5,
+        maxPoints = 5,
+        poolVec = new Ayce.Vector3(),
+        sendO3Ds = [],
+        scope = this;
+    
+    this.id = id;
+    this.players = [];
+    this.spectators = [];
+    this.join = function(userId, socket){
         totalUsers++;
         var user = {};
 
@@ -142,36 +161,43 @@ var Game = function(id){
         user.getGlobalPosition = function(){return this.position;};
 
         user.socket.on('error', function (err) {
-            console.log("Game "+id + ": " + err);
+            console.log("Error. Game "+id + ": " + err);
         });
 
-        if(scope.players[0] == undefined || scope.players[1] == undefined) {
+        if(scope.players[0] === undefined || scope.players[1] === undefined) {
             var playerIndex;
-            if (scope.players.length == 0) {    // PLAYER1
+            
+            //is player1
+            if (scope.players[0] === undefined) {
                 playerIndex = 0;
-            }else {                             //PLAYER2
-                playerIndex = 1;
-            }
-
-            user.playerType = "player"+(playerIndex+1);
-            //if(scope.players[0]){
-            //    console.log(scope.players[0].ready);
-            //}
-            //if(scope.players[1]){
-            //    console.log(scope.players[1].ready);
-            //}
-            if(playerIndex==0){
                 user.position.z = -17;
                 user.rotation.fromEulerAngles(0, Math.PI, 0);
-            }else{
-                user.position.z = 17;
+                
+                if(scope.players[1] && scope.players[1].ready){
+                    user.socket.emit('ready_up', {type: scope.players[1].playerType});
+                }
             }
+            //is player2
+            else {
+                playerIndex = 1;
+                user.position.z = 17;
+                if(scope.players[0] && scope.players[0].ready){
+                    user.socket.emit('ready_up', {type: scope.players[0].playerType});
+                }
+            }
+            
+            user.playerType = "player"+(playerIndex+1);
+            scope.players[playerIndex] = user;
+            panes[playerIndex].active = true;
+            panes[playerIndex].empty.parent = user;
+            panes[playerIndex].clientID = user.id;
+            
 
             user.socket.on('player_ready', function (data) {
                 if(!scope.players[playerIndex].ready){
-                    console.log("player " + scope.players[playerIndex].id + " ready.");
                     scope.players[playerIndex].ready = data.ready;
                     emitToEveryone('ready_up', {type: scope.players[playerIndex].playerType});
+                    console.log("Game " + id + ": Player " + (playerIndex+1) + " ready.");
                 }
             });
             user.socket.on('camera_pos', function(data){
@@ -184,30 +210,18 @@ var Game = function(id){
                 scope.players[playerIndex].rotation.z = data.orientation.z;
                 scope.players[playerIndex].rotation.w = data.orientation.w;
             });
-            panes[playerIndex].active = true;
-            panes[playerIndex].empty.parent = user;
-            panes[playerIndex].clientID = user.id;
-
             user.socket.on('disconnect', function(){
-                emitToEveryone('remove_player', { id: scope.players[playerIndex].id, type: scope.players[playerIndex].type});
-                onPlayerExit(scope.players[playerIndex].id);
-                console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+scope.players[playerIndex].id+") left.");
-                scope.players[playerIndex] = undefined;
+                console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+user.id+") left.");
+                emitToEveryone('remove_player', { id: user.id, type: user.playerType});
+                onPlayerExit(user.playerType);
                 totalUsers--;
                 killEmptyGame();
             });
-            scope.players[playerIndex] = user;
-
-            if(playerIndex==0){
-                if(scope.players[1] && scope.players[1].ready) emitToEveryone('ready_up', {type: scope.players[1].playerType});
-            }else{
-                if(scope.players[0] && scope.players[0].ready) emitToEveryone('ready_up', {type: scope.players[0].playerType});
-            }
 
             console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+scope.players[playerIndex].id+") joined.");
-
             user.socket.emit('id', {id: user.id, type: user.playerType});
-        }else {
+        }
+        else{
             user.playerType = "spectator";
             user.position.x = 15;
             user.rotation.fromEulerAngles(0, -Math.PI/2.0, 0);
@@ -225,7 +239,7 @@ var Game = function(id){
             user.socket.on('disconnect', function(data){
                 console.log("Game " + id + ": Spectator (ID#"+scope.spectators[spectatorIndex].id+") left.");
                 emitToEveryone('remove_player', { id: scope.spectators[spectatorIndex].id});
-                console.log("spectatorIndex " + spectatorIndex);
+                console.log("Game " + id + ": spectatorIndex " + spectatorIndex);
                 scope.spectators[spectatorIndex] = undefined;
                 totalUsers--;
                 killEmptyGame();
@@ -259,9 +273,10 @@ var Game = function(id){
             empty: new Ayce.Object3D()
         }
     ];
-
+    
+    //Game sequence
     var init = function(){
-        console.log("Initializing...");
+        console.log("Game " + id + ":Initializing...");
 
         frontWall = new Ayce.Geometry.Box(6, 5, 0.5);
         frontWall.offset.set(-frontWall.a/2.0, -frontWall.b/2.0, -frontWall.c);
@@ -341,7 +356,6 @@ var Game = function(id){
 
         addO3D(frontWall, backWall, leftWall, rightWall, bottomWall, leftWall, topWall, ball);
     };
-
     var update = function(){
         loops[0] = setTimeout(update, 16);
 
@@ -388,9 +402,6 @@ var Game = function(id){
             o3Ds[i].update();
         }
     };
-
-    var sendO3Ds = [];
-
     var send = function(){
         loops[1] = setTimeout(send, 100);
 
@@ -404,8 +415,7 @@ var Game = function(id){
     };
 
 
-    // helpers
-
+    //helper functions
     var emitToEveryone = function(key, message){
         for(var i = 0; i < scope.players.length; i++){
             if(scope.players[i] != undefined) scope.players[i].socket.emit(key, message);
@@ -414,13 +424,11 @@ var Game = function(id){
             if(scope.spectators[i] != undefined) scope.spectators[i].socket.emit(key, message);
         }
     };
-
     var addScore = function(player){
         if(player === 0)score1 = (score1+1)%100;
         else if(player === 1)score2 = (score2+1)%100;
         emitToEveryone('score', {score1:score1, score2:score2});
     };
-
     var sendO3D_Client = function(type, id, args, pushToContainer, socket){
         var o = {
             type: type,
@@ -433,7 +441,6 @@ var Game = function(id){
             emitToEveryone('add_O3D', o);
         }
     };
-
     var addO3D = function(){
         for(var o3D in arguments){
             arguments[o3D].calcBoundingBox();
@@ -441,7 +448,6 @@ var Game = function(id){
             o3Ds.push(arguments[o3D]);
         }
     };
-
     var updatePane = function(paneObj){
         poolVec.set(0, 0, -1);
 
@@ -473,26 +479,30 @@ var Game = function(id){
             pane.position.z -= poolVec.z < 0 ? 4 : -2.5;
         }
     };
-
+    
     var onPlayersConnected = function(){
         //console.log("Players connected.");
     };
-
     var onPlayerDisconnected = function(){
         //console.log("Player disconnected.");
         firstReady = true;
     };
-
+    var onRoundStart = function(){
+        console.log(id + ": Round start.");
+        resetScore();
+        ball.position.set(0, aquariumHeight, 0);
+        ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
+        lastBallMiss = Date.now();
+    };
     var onRoundAbort = function(){
-        console.log("Round end.");
+        console.log("Game " + id + ": Round abort.");
         roundActive = false;
         ball.position.set(0, aquariumHeight, 0);
         ball.velocity.set(0, 0, 0);
     };
-
     var onPlayersReady = function(){
         if(firstReady){
-            console.log("Players are ready.");
+            console.log("Game " + id + ":Players are ready.");
             readyCount = 0;
             readyTime = Date.now();
             firstReady = false;
@@ -501,7 +511,7 @@ var Game = function(id){
         var duration = Date.now() - readyTime;
 
         if(duration/1000.0 > readyCount){
-            console.log(countIn-readyCount);
+//            console.log(countIn-readyCount);
             readyCount++;
             if(readyCount > countIn){
                 onRoundStart();
@@ -510,7 +520,6 @@ var Game = function(id){
             }
         }
     };
-
     var onPlayerExit = function(type){
         if(type == "player1"){
             scope.players[0] = undefined;
@@ -521,16 +530,15 @@ var Game = function(id){
             panes[1].active = false;
         }
     };
-
     var onRoundFinished = function(){
         if(score1 >= maxPoints || score2 >= maxPoints){
-            console.log("Max points.");
+            console.log("Game " + id + ":Max points.");
             onRoundAbort();
             scope.players[0].ready = false;
             scope.players[1].ready = false;
         }
     };
-
+    
     var getPlayersPacket = function(){
         var packet = [];
         for(i = 0; i < scope.players.length; i++) {
@@ -553,21 +561,11 @@ var Game = function(id){
         }
         return packet;
     };
-
-    var onRoundStart = function(){
-        console.log("Round start.");
-        resetScore();
-        ball.position.set(0, aquariumHeight, 0);
-        ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
-        lastBallMiss = Date.now();
-    };
-
     var resetScore = function(){
         score1 = 0;
         score2 = 0;
         emitToEveryone('score', {score1:score1, score2:score2});
     };
-
     var killEmptyGame = function(){
         if(totalUsers <= 0){
             clearTimeout(loops[0]);
