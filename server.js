@@ -5,7 +5,7 @@ var fs = require('fs'),
       key: fs.readFileSync('./privkey1.pem'),
       cert: fs.readFileSync('./fullchain1.pem')
     },app),
-//    server = require('http').createServer(app),
+    //server = require('http').createServer(app),
     io = require('socket.io').listen(server),
     conf = require('./config.json'),
     Ayce = require('AyceVR.min.js');
@@ -221,6 +221,9 @@ var Game = function(id, pushRandom){
             user.socket.on('disconnect', function(){
                 console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+user.id+") left.");
                 emitToEveryone('remove_player', { id: user.id, type: user.playerType});
+                if(user.ready) {
+                    emitToEveryone('cancel_ready');
+                }
                 onPlayerExit(user.playerType);
                 totalUsers--;
                 killEmptyGame();
