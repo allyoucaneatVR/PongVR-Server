@@ -26,18 +26,18 @@ io.sockets.on('connection', function (socket) {
     gameIDCount++;
     
     var userId = idCount;
-    var gameID = gameIDCount;
+    var gameID = gameIDCount+""+String.fromCharCode(97+Math.floor(Math.random()*26));
     
     for(var i=0; i<5; i++){
         if(Math.random() < 0.5){
             gameID += ""+Math.floor(Math.random()*9);
         }
         else{
-            gameID += ""+String.fromCharCode(97+Math.floor(Math.random()*24));
+            gameID += ""+String.fromCharCode(97+Math.floor(Math.random()*26));
         }
     }
     
-    //Securely remove from pendingGames 
+    //TODO Securely remove from pendingGames 
     pendingGames.push(gameID);
     var game = null;
     
@@ -54,7 +54,7 @@ io.sockets.on('connection', function (socket) {
                 gameID = game.id;
             }
             else{
-                game = new Game(gameID);
+                game = new Game(gameID, true);
                 pendingRandom.push(game);
                 runningGames.push(game);
             }
@@ -121,13 +121,21 @@ var killGame = function(id){
             break;
         }
     }
+    
     var ipG = pendingGames.indexOf(id);
     if(ipG >= 0){
         pendingGames.splice(ipG, 1);
     }
+    
+    
+    for(var i = 0; i < pendingRandom.length; i++){
+        if(pendingRandom[i].id == id){
+            pendingRandom.splice(i, 1);
+        }
+    }
     console.log(runningGames.length + " running games left.");
 };
-var Game = function(id){
+var Game = function(id, pushRandom){
     var loops = [],
         totalUsers = 0,
         lastBallMiss = 0,
@@ -571,6 +579,9 @@ var Game = function(id){
             clearTimeout(loops[0]);
             clearTimeout(loops[1]);
             killGame(id);
+        }
+        else if(totalUsers <= 1 && pushRandom){
+            pendingRandom.push(scope);
         }
     };
 
