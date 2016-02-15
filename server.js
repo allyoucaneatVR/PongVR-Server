@@ -323,15 +323,13 @@ var Game = function(id, pushRandom){
         leftWall.position.set(-3, aquariumHeight, 0);
         rightWall.position.set(3, aquariumHeight, 0);
 
-        var paneScale = new Ayce.Vector3(1.25, 1, 0.1);
-
         panes[0].empty.position = new Ayce.Vector3(0, 0, -4);
-        panes[0].pane.scale = paneScale;
+        panes[0].pane.scale.set(1.30*0.5, 1.05*0.5, 0.1);
         panes[0].pane.calcBoundingBox();
         panes[0].pane.calcBoundingSphere();
 
         panes[1].empty.position = new Ayce.Vector3(0, 0, -4);
-        panes[1].pane.scale = paneScale;
+        panes[1].pane.scale.set(1.30*0.5, 1.05*0.5, 0.1);
         panes[1].pane.calcBoundingBox();
         panes[1].pane.calcBoundingSphere();
 
