@@ -1,11 +1,11 @@
 var fs = require('fs'),
     express = require('express'),   
     app = express(),
-    server = require('https').createServer({
-      key: fs.readFileSync('./privkey1.pem'),
-      cert: fs.readFileSync('./fullchain1.pem')
-    },app),
-    //server = require('http').createServer(app),
+    //server = require('https').createServer({
+    //  key: fs.readFileSync('./privkey1.pem'),
+    //  cert: fs.readFileSync('./fullchain1.pem')
+    //},app),
+    server = require('http').createServer(app),
     io = require('socket.io').listen(server),
     conf = require('./config.json'),
     Ayce = require('AyceVR.min.js');
@@ -14,6 +14,7 @@ var i = 0,
     idCount = 0,
     aquariumHeight = 10,
     initialZVelocity = 5,
+    scoreVelocityRaise = 1,
     zVelocityFactor = 2001/2000,
     maxZVelocity = 15,
     gameIDCount = 1;
@@ -150,8 +151,10 @@ var Game = function(id, pushRandom){
         maxPoints = 5,
         poolVec = new Ayce.Vector3(),
         sendO3Ds = [],
-        scope = this;
-    
+        scope = this,
+        currentScoreZVelocity = initialZVelocity,
+        linearSpeed = 0;
+
     this.id = id;
     this.players = [];
     this.spectators = [];
@@ -347,14 +350,17 @@ var Game = function(id, pushRandom){
             emitToEveryone('collision', sendData);
 
             if(collisionData.collisionWith === frontWall){
+                currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -initialZVelocity);
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
+
                 addScore(0);
                 lastBallMiss = Date.now();
             }
             else if(collisionData.collisionWith === backWall){
+                currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
                 addScore(1);
                 lastBallMiss = Date.now();
             }
@@ -369,9 +375,14 @@ var Game = function(id, pushRandom){
         loops[0] = setTimeout(update, 16);
 
         if(Math.abs(ball.velocity.z) < maxZVelocity) {
-            //linear
-            if (ball.velocity.z < 0) ball.velocity.z -= initialZVelocity * (zVelocityFactor - 1);
-            else if (ball.velocity.z > 0) ball.velocity.z += initialZVelocity * (zVelocityFactor - 1);
+            ////linear
+            //if (ball.velocity.z < 0) ball.velocity.z -= currentScoreZVelocity * (zVelocityFactor - 1);
+            //else if (ball.velocity.z > 0) ball.velocity.z += currentScoreZVelocity * (zVelocityFactor - 1);
+
+            linearSpeed+=0.01;
+
+            if (ball.velocity.z < 0) ball.velocity.z -= Math.sqrt(linearSpeed)*(currentScoreZVelocity * (zVelocityFactor - 1));
+            else if (ball.velocity.z > 0) ball.velocity.z += Math.sqrt(linearSpeed)*(currentScoreZVelocity * (zVelocityFactor - 1));
 
             //quadratic
             //ball.velocity.z *= zVelocityFactor;
@@ -508,6 +519,8 @@ var Game = function(id, pushRandom){
         roundActive = false;
         ball.position.set(0, aquariumHeight, 0);
         ball.velocity.set(0, 0, 0);
+        linearSpeed = 0;
+        currentScoreZVelocity = initialZVelocity;
     };
     var onPlayersReady = function(){
         if(firstReady){
