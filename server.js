@@ -1,11 +1,11 @@
 var fs = require('fs'),
     express = require('express'),   
     app = express(),
-    //server = require('https').createServer({
-    //  key: fs.readFileSync('./privkey1.pem'),
-    //  cert: fs.readFileSync('./fullchain1.pem')
-    //},app),
-    server = require('http').createServer(app),
+    server = require('https').createServer({
+      key: fs.readFileSync('./privkey1.pem'),
+      cert: fs.readFileSync('./fullchain1.pem')
+    },app),
+    //server = require('http').createServer(app),
     io = require('socket.io').listen(server),
     conf = require('./config.json'),
     Ayce = require('AyceVR.min.js');
@@ -13,9 +13,10 @@ var fs = require('fs'),
 var i = 0, 
     idCount = 0,
     aquariumHeight = 10,
-    initialZVelocity = 5,
+    initialZVelocity = 4,
     scoreVelocityRaise = 1,
-    zVelocityFactor = 2001/2000,
+    //zVelocityFactor = 20005/20000,
+    zVelocityFactor = 1.00025,
     maxZVelocity = 15,
     gameIDCount = 1;
 
@@ -349,24 +350,34 @@ var Game = function(id, pushRandom){
             sendData.position = ball.position;
             emitToEveryone('collision', sendData);
 
-            if(collisionData.collisionWith === frontWall){
+            if(collisionData.collisionWith === panes[0].pane || collisionData.collisionWith === panes[0].pane){
+                var normal = collisionData.collisionVector.normal.copy();
+                normal.scaleBy(-2*normal.dotProduct(ball.velocity));
+                ball.velocity = ball.velocity.addVector3(normal);
+                var randomScale = new Ayce.Vector3(
+                    Math.random() * 2 - 1,
+                    Math.random() * 2 - 1,
+                    0
+                );
+                ball.velocity.add(randomScale.x, randomScale.y, randomScale.z);
+            }else if(collisionData.collisionWith === frontWall){
                 currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
                 ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
 
                 addScore(0);
                 lastBallMiss = Date.now();
-            }
-            else if(collisionData.collisionWith === backWall){
+            }else if(collisionData.collisionWith === backWall){
                 currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
                 ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
                 addScore(1);
                 lastBallMiss = Date.now();
+            }else {
+                var normal = collisionData.collisionVector.normal.copy();
+                normal.scaleBy(-2 * normal.dotProduct(ball.velocity));
+                ball.velocity = ball.velocity.addVector3(normal);
             }
-            var normal = collisionData.collisionVector.normal.copy();
-            normal.scaleBy(-2*normal.dotProduct(ball.velocity));
-            ball.velocity = ball.velocity.addVector3(normal);
         };
 
         addO3D(frontWall, backWall, leftWall, rightWall, bottomWall, leftWall, topWall, ball);
