@@ -444,7 +444,7 @@ var Game = function(id, pushRandom){
             o3Ds[i].update();
         }
 
-        if(postScore){
+        if(postScore && score1 < 5 && score2 < 5){
             postScoreBreak += 16;
             ball.velocity.set(0, 0, 0);
             if(postScoreBreak >= 1500){
