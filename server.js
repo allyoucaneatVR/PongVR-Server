@@ -154,7 +154,10 @@ var Game = function(id, pushRandom){
         sendO3Ds = [],
         scope = this,
         currentScoreZVelocity = initialZVelocity,
-        linearSpeed = 0;
+        linearSpeed = 0,
+        postScore = false,
+        postScoreBreak = 0,
+        ballDirection = 1;
 
     this.id = id;
     this.players = [];
@@ -363,14 +366,20 @@ var Game = function(id, pushRandom){
             }else if(collisionData.collisionWith === frontWall){
                 currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
+                postScore = true;
+                ball.velocity.set(0, 0, 0);
+                ballDirection = 1;
+                //ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
 
                 addScore(0);
                 lastBallMiss = Date.now();
             }else if(collisionData.collisionWith === backWall){
                 currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
+                postScore = true;
+                ball.velocity.set(0, 0, 0);
+                //ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
+                ballDirection = -1;
                 addScore(1);
                 lastBallMiss = Date.now();
             }else {
@@ -378,11 +387,13 @@ var Game = function(id, pushRandom){
                 normal.scaleBy(-2 * normal.dotProduct(ball.velocity));
                 ball.velocity = ball.velocity.addVector3(normal);
             }
+
         };
 
         addO3D(frontWall, backWall, leftWall, rightWall, bottomWall, leftWall, topWall, ball);
     };
     var update = function(){
+
         loops[0] = setTimeout(update, 16);
 
         if(Math.abs(ball.velocity.z) < maxZVelocity) {
@@ -431,6 +442,16 @@ var Game = function(id, pushRandom){
 
         for(i=0; i<o3Ds.length; i++){
             o3Ds[i].update();
+        }
+
+        if(postScore){
+            postScoreBreak += 16;
+            ball.velocity.set(0, 0, 0);
+            if(postScoreBreak >= 1500){
+                postScoreBreak = 0;
+                postScore = false;
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), ballDirection * currentScoreZVelocity);
+            }
         }
     };
     var send = function(){
