@@ -363,14 +363,14 @@ var Game = function(id, pushRandom){
             }else if(collisionData.collisionWith === frontWall){
                 currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
 
                 addScore(0);
                 lastBallMiss = Date.now();
             }else if(collisionData.collisionWith === backWall){
                 currentScoreZVelocity += scoreVelocityRaise;
                 ball.position.set(0, aquariumHeight, 0);
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
+                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
                 addScore(1);
                 lastBallMiss = Date.now();
             }else {
