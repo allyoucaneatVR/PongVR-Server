@@ -1,11 +1,11 @@
 var fs = require('fs'),
     express = require('express'),   
     app = express(),
-    server = require('https').createServer({
+    /*server = require('https').createServer({
       key: fs.readFileSync('./privkey1.pem'),
       cert: fs.readFileSync('./fullchain1.pem')
-    },app),
-    //server = require('http').createServer(app),
+    },app),*/
+    server = require('http').createServer(app),
     io = require('socket.io').listen(server),
     conf = require('./config.json'),
     Ayce = require('AyceVR.min.js');
@@ -155,8 +155,6 @@ var Game = function(id, pushRandom){
         scope = this,
         currentScoreZVelocity = initialZVelocity,
         linearSpeed = 0,
-        postScore = false,
-        postScoreBreak = 0,
         ballDirection = 1;
 
     this.id = id;
@@ -238,8 +236,7 @@ var Game = function(id, pushRandom){
 
             console.log("Game " + id + ": Player"+(playerIndex+1)+" (ID#"+scope.players[playerIndex].id+") joined.");
             user.socket.emit('id', {id: user.id, type: user.playerType});
-        }
-        else{
+        }else{
             user.playerType = "spectator";
             user.position.x = 15;
             user.rotation.fromEulerAngles(0, -Math.PI/2.0, 0);
@@ -265,15 +262,18 @@ var Game = function(id, pushRandom){
             scope.spectators.push(user);
             console.log("Game " + id + ": Spectator (ID#"+scope.spectators[scope.spectators.length-1].id+") joined.");
         }
-        user.socket.emit('change_positon', {position: user.position, rotation: user.rotation});
+        user.socket.emit('change_positon', {position: user.position, rotation: user.rotation});     // TODO: Typo: positon -> position
 
-        sendO3D_Client("sphere", "ball", {position: ball.position, velocity: ball.velocity}, user.socket);
+        for(var i = 0; i < balls.length; i++) {
+            sendO3D_Client("sphere", "ball"+i, {position: balls[i].position, velocity: balls[i].velocity, visible: balls[i].visible, index: i}, user.socket);
+        }
         sendO3D_Client("pane", "paneP1", {position: panes[0].position}, user.socket);
         sendO3D_Client("pane", "paneP2", {position: panes[1].position}, user.socket);
     };
 
     var frontWall, backWall, topWall, bottomWall,
-        leftWall, rightWall, ball, ballCollision;
+        leftWall, rightWall, balls, ballCollision;
+    var numberOfSpheres = 2;
 
     var panes = [
         {
@@ -320,7 +320,13 @@ var Game = function(id, pushRandom){
         rightWall.offset.set(0, -rightWall.b/2.0, -rightWall.c/2.0);
         rightWall = rightWall.getO3D();
 
-        ball = new Ayce.Geometry.Sphere(0.2).getO3D();
+        balls = [
+            new Ayce.Geometry.Sphere(0.2).getO3D(),
+            new Ayce.Geometry.Sphere(0.2).getO3D(),
+            new Ayce.Geometry.Sphere(0.2).getO3D(),     // TODO: why does only one sphere move after scoring
+            new Ayce.Geometry.Sphere(0.2).getO3D(),
+            new Ayce.Geometry.Sphere(0.2).getO3D()
+        ];
         ballCollision = [frontWall, backWall, topWall, bottomWall, leftWall, rightWall];
 
         frontWall.position.set(0, aquariumHeight, -20);
@@ -342,73 +348,67 @@ var Game = function(id, pushRandom){
 
         ballCollision.push(panes[0].pane, panes[1].pane);
         o3Ds.push(panes[0].pane, panes[1].pane);
+        addO3D(frontWall, backWall, leftWall, rightWall, bottomWall, leftWall, topWall);
 
-        ball.position.set(0, aquariumHeight, 0);
-        ball.velocity.set(0, 0, 0);
-        ball.collision = true;
-        ball.collideWith = ballCollision;
-        ball.onCollision = function(collisionData){
-            var sendData = {};
-            sendData.id = "ball";
-            sendData.position = ball.position;
-            emitToEveryone('collision', sendData);
+        var setUpBall = function(i){
+            balls[i].position.set(0, aquariumHeight, 0);
+            balls[i].velocity.set(0, 0, 0);
+            balls[i].collision = true;
+            balls[i].collideWith = ballCollision;
+            balls[i].postScore = false;
+            balls[i].postScoreBreak = 0;
+            balls[i].onCollision = function(collisionData){
+                var sendData = {};
+                sendData.id = "ball"+i;
+                sendData.position = balls[i].position;
+                emitToEveryone('collision', sendData);
 
-            if(collisionData.collisionWith === panes[0].pane || collisionData.collisionWith === panes[0].pane){
-                var normal = collisionData.collisionVector.normal.copy();
-                normal.scaleBy(-2*normal.dotProduct(ball.velocity));
-                ball.velocity = ball.velocity.addVector3(normal);
-                var randomScale = new Ayce.Vector3(
-                    Math.random() * 2 - 1,
-                    Math.random() * 2 - 1,
-                    0
-                );
-                ball.velocity.add(randomScale.x, randomScale.y, randomScale.z);
-            }else if(collisionData.collisionWith === frontWall){
-                currentScoreZVelocity += scoreVelocityRaise;
-                ball.position.set(0, aquariumHeight, 0);
-                postScore = true;
-                ball.velocity.set(0, 0, 0);
-                ballDirection = 1;
-                //ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
+                if(collisionData.collisionWith === panes[i].pane || collisionData.collisionWith === panes[i].pane){
+                    var normal = collisionData.collisionVector.normal.copy();
+                    normal.scaleBy(-2*normal.dotProduct(balls[i].velocity));
+                    balls[i].velocity = balls[i].velocity.addVector3(normal);
+                    var randomScale = new Ayce.Vector3(
+                        Math.random() * 2 - 1,
+                        Math.random() * 2 - 1,
+                        0
+                    );
+                    balls[i].velocity.add(randomScale.x, randomScale.y, randomScale.z);
+                }else if(collisionData.collisionWith === frontWall){
+                    currentScoreZVelocity += scoreVelocityRaise;
+                    balls[i].position.set(0, aquariumHeight, 0);
+                    balls[i].postScore = true;
+                    balls[i].velocity.set(0, 0, 0);
+                    ballDirection = 1;
+                    //ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), currentScoreZVelocity);
 
-                addScore(0);
-                lastBallMiss = Date.now();
-            }else if(collisionData.collisionWith === backWall){
-                currentScoreZVelocity += scoreVelocityRaise;
-                ball.position.set(0, aquariumHeight, 0);
-                postScore = true;
-                ball.velocity.set(0, 0, 0);
-                //ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
-                ballDirection = -1;
-                addScore(1);
-                lastBallMiss = Date.now();
-            }else {
-                var normal = collisionData.collisionVector.normal.copy();
-                normal.scaleBy(-2 * normal.dotProduct(ball.velocity));
-                ball.velocity = ball.velocity.addVector3(normal);
-            }
+                    addScore(0);
+                    lastBallMiss = Date.now();
+                }else if(collisionData.collisionWith === backWall){
+                    currentScoreZVelocity += scoreVelocityRaise;
+                    balls[i].position.set(0, aquariumHeight, 0);
+                    balls[i].postScore = true;
+                    balls[i].velocity.set(0, 0, 0);
+                    //ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), -currentScoreZVelocity);
+                    ballDirection = -1;
+                    addScore(1);
+                    lastBallMiss = Date.now();
+                }else {
+                    normal = collisionData.collisionVector.normal.copy();
+                    normal.scaleBy(-2 * normal.dotProduct(balls[i].velocity));
+                    balls[i].velocity = balls[i].velocity.addVector3(normal);
+                }
 
+            };
+            addO3D(balls[i]);
         };
 
-        addO3D(frontWall, backWall, leftWall, rightWall, bottomWall, leftWall, topWall, ball);
+        for(var i = 0; i < balls.length; i++){
+            setUpBall(i);
+        }
     };
     var update = function(){
 
         loops[0] = setTimeout(update, 16);
-
-        if(Math.abs(ball.velocity.z) < maxZVelocity) {
-            ////linear
-            //if (ball.velocity.z < 0) ball.velocity.z -= currentScoreZVelocity * (zVelocityFactor - 1);
-            //else if (ball.velocity.z > 0) ball.velocity.z += currentScoreZVelocity * (zVelocityFactor - 1);
-
-            linearSpeed+=0.01;
-
-            if (ball.velocity.z < 0) ball.velocity.z -= Math.sqrt(linearSpeed)*(currentScoreZVelocity * (zVelocityFactor - 1));
-            else if (ball.velocity.z > 0) ball.velocity.z += Math.sqrt(linearSpeed)*(currentScoreZVelocity * (zVelocityFactor - 1));
-
-            //quadratic
-            //ball.velocity.z *= zVelocityFactor;
-        }
 
         if(panes[0].active)updatePane(panes[0]);
         if(panes[1].active)updatePane(panes[1]);
@@ -444,13 +444,34 @@ var Game = function(id, pushRandom){
             o3Ds[i].update();
         }
 
-        if(postScore && score1 < 5 && score2 < 5){
-            postScoreBreak += 16;
-            ball.velocity.set(0, 0, 0);
-            if(postScoreBreak >= 1500){
-                postScoreBreak = 0;
-                postScore = false;
-                ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), ballDirection * currentScoreZVelocity);
+        for(var i = 0; i <balls.length; i++) {
+            if(i < numberOfSpheres) {
+                if (Math.abs(balls[i].velocity.z) < maxZVelocity) {
+                    balls[i].visible = true;
+                    ////linear
+                    //if (ball.velocity.z < 0) ball.velocity.z -= currentScoreZVelocity * (zVelocityFactor - 1);
+                    //else if (ball.velocity.z > 0) ball.velocity.z += currentScoreZVelocity * (zVelocityFactor - 1);
+
+                    linearSpeed += 0.01;
+
+                    if (balls[i].velocity.z < 0) balls[i].velocity.z -= Math.sqrt(linearSpeed) * (currentScoreZVelocity * (zVelocityFactor - 1));
+                    else if (balls[i].velocity.z > 0) balls[i].velocity.z += Math.sqrt(linearSpeed) * (currentScoreZVelocity * (zVelocityFactor - 1));
+
+                    //quadratic
+                    //ball.velocity.z *= zVelocityFactor;
+                }
+
+                if (balls[i].postScore && score1 < 5 && score2 < 5) {
+                    balls[i].postScoreBreak += 16;
+                    balls[i].velocity.set(0, 0, 0);
+                    if (balls[i].postScoreBreak >= 1500) {
+                        balls[i].postScoreBreak = 0;
+                        balls[i].postScore = false;
+                        balls[i].velocity.set(1 + 0.5 * Math.random(), -2 + 4 * Math.random(), ballDirection * currentScoreZVelocity);
+                    }
+                }
+            }else{
+                balls[i].visible = false;
             }
         }
     };
@@ -458,7 +479,17 @@ var Game = function(id, pushRandom){
         loops[1] = setTimeout(send, 100);
 
         sendO3Ds.length = 0;
-        sendO3Ds.push({ id: 'ball', position: ball.position, rotation: ball.rotation, velocity: ball.velocity});
+
+        for(var i = 0; i < balls.length; i++){
+            sendO3Ds.push({
+                id: 'ball'+i,
+                position: balls[i].position,
+                rotation: balls[i].rotation,
+                velocity: balls[i].velocity,
+                visible: balls[i].visible,
+                index: i
+            });
+        }
         sendO3Ds.push({ id: 'paneP1', position: panes[0].pane.position, rotation: panes[0].pane.rotation});
         sendO3Ds.push({ id: 'paneP2', position: panes[1].pane.position, rotation: panes[1].pane.rotation});
 
@@ -542,15 +573,26 @@ var Game = function(id, pushRandom){
     var onRoundStart = function(){
         console.log(id + ": Round start.");
         resetScore();
-        ball.position.set(0, aquariumHeight, 0);
-        ball.velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
+        for(var i = 0; i < numberOfSpheres; i++){
+            balls[i].position.set(0, aquariumHeight, 0);
+            balls[i].velocity.set(1 + 0.5*Math.random(), -2 + 4*Math.random(), initialZVelocity);
+            balls[i].visible = true;
+        }
+        for(var i = numberOfSpheres; i < balls.length; i++){
+            balls[i].position.set(0, aquariumHeight, 0);
+            balls[i].velocity.set(0, 0, 0);
+            balls[i].visible = false;
+        }
         lastBallMiss = Date.now();
     };
     var onRoundAbort = function(){
         console.log("Game " + id + ": Round abort.");
         roundActive = false;
-        ball.position.set(0, aquariumHeight, 0);
-        ball.velocity.set(0, 0, 0);
+        for(var i = 0; i < balls.length; i++) {
+            balls[i].position.set(0, aquariumHeight, 0);
+            balls[i].velocity.set(0, 0, 0);
+            balls[i].visible = false;
+        }
         linearSpeed = 0;
         currentScoreZVelocity = initialZVelocity;
     };
