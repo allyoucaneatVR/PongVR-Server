@@ -12,7 +12,7 @@ var fs = require('fs'),
 
 var i = 0, 
     idCount = 0,
-    aquariumHeight = 10,
+    aquariumHeight = 2,
     initialZVelocity = 4,
     scoreVelocityRaise = 1,
     //zVelocityFactor = 20005/20000,
@@ -323,7 +323,7 @@ var Game = function(id, pushRandom){
         balls = [
             new Ayce.Geometry.Sphere(0.2).getO3D(),
             new Ayce.Geometry.Sphere(0.2).getO3D(),
-            new Ayce.Geometry.Sphere(0.2).getO3D(),     // TODO: why does only one sphere move after scoring
+            new Ayce.Geometry.Sphere(0.2).getO3D(),
             new Ayce.Geometry.Sphere(0.2).getO3D(),
             new Ayce.Geometry.Sphere(0.2).getO3D()
         ];
